@@ -1,61 +1,126 @@
-# Moves the formula to a release of denrou/slack: rewrites it, installs and
-# tests it, then commits. The Release workflow of denrou/slack dispatches it
-# once the archives are published; by hand:
+# Moves one formula to the latest release of its tool, checks it, then
+# commits. The release workflow of each tool dispatches it; by hand:
 #
-#   gh workflow run update-formula.yml --repo denrou/homebrew-slack
+#   gh workflow run update-formula.yml --repo denrou/homebrew-tap -f formula=ggit
 
 name: Update Formula
 
 on:
   workflow_dispatch:
     inputs:
+      formula:
+        description: "Formula to update"
+        required: true
+        type: choice
+        options:
+          - slack
+          - gh-prs
+          - ggit
       version:
-        description: "Release of denrou/slack, without the v (default: the latest)"
+        description: "slack only: the release, without the v (default: the latest)"
         required: false
         default: ""
 
 permissions:
   contents: write
 
+# One run per formula at a time, so two releases of a tool cannot rewrite the
+# same file at once; different formulas run side by side.
+concurrency:
+  group: update-formula-${{ inputs.formula }}
+  cancel-in-progress: false
+
 jobs:
-  update:
-    # macOS rather than Linux: the formula ships a binary, and the macOS one
-    # is the one in use, so it is the one to install and test here.
+  # slack ships prebuilt binaries, described from the release's checksums.
+  slack:
+    if: inputs.formula == 'slack'
+    # macOS rather than Linux: the macOS binary is the one in use, so it is
+    # the one to install and test here.
     runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
-      - run: ./update "$VERSION"
+      - run: scripts/update-slack "$VERSION"
         env:
           VERSION: ${{ inputs.version }}
 
       # brew reads formulae from taps only, so the checkout becomes one.
-      - name: Register the checkout as the denrou/slack tap
+      - name: Register the checkout as the denrou/tap tap
         run: |
           taps="$(brew --repository)/Library/Taps/denrou"
           mkdir -p "$taps"
-          ln -s "$GITHUB_WORKSPACE" "$taps/homebrew-slack"
+          ln -s "$GITHUB_WORKSPACE" "$taps/homebrew-tap"
 
-      - run: brew audit --strict denrou/slack/slack
+      - run: brew audit --strict denrou/tap/slack
 
-      - run: brew install --verbose denrou/slack/slack
+      - run: brew install --verbose denrou/tap/slack
 
-      - run: brew test --verbose denrou/slack/slack
+      - run: brew test --verbose denrou/tap/slack
 
       - name: Commit and push if changed
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          if git diff --quiet -- Formula/slack.rb; then
-            echo "The formula already described that release."
-            exit 0
-          fi
           version="$(sed -n 's|.*/releases/download/v\([^/]*\)/.*|\1|p' Formula/slack.rb | head -n 1)"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -am "Update slack to ${version}"
-          # Explicit token and refspec, as in the other denrou taps: a plain
-          # push had no credentials there once the checkout was a tap.
-          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git push origin HEAD:main
+          scripts/commit-formula slack "$version"
+
+  # gh-prs and ggit are Python packages, built from their PyPI sdist.
+  pypi:
+    if: inputs.formula != 'slack'
+    runs-on: ubuntu-latest
+    env:
+      FORMULA: ${{ inputs.formula }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Pinned: the master ref is deprecated and will hard-error at Homebrew 5.2.0.
+      - uses: Homebrew/actions/setup-homebrew@1f8e202ffddf94def7f42f6fa3a482e821489f9c # 2026.07.10.1
+
+      # brew reads formulae from taps only, so the checkout becomes one, which
+      # update-python-resources then edits in place.
+      - name: Register the checkout as the denrou/tap tap
+        run: |
+          taps="$(brew --repository)/Library/Taps/denrou"
+          mkdir -p "$taps"
+          ln -s "$GITHUB_WORKSPACE" "$taps/homebrew-tap"
+
+      # Point the formula's own url/sha256 at the latest PyPI sdist. The
+      # version is carried in the url, so there is no separate version line
+      # to bump; update-python-resources infers it from the url below.
+      - name: Bump to the latest release
+        id: bump
+        run: |
+          read -r version url sha256 <<EOF
+          $(python3 - <<'PY'
+          import json, os, urllib.request
+          name = os.environ["FORMULA"]
+          d = json.load(urllib.request.urlopen(f"https://pypi.org/pypi/{name}/json"))
+          v = d["info"]["version"]
+          sdist = next(u for u in d["releases"][v] if u["packagetype"] == "sdist")
+          print(v, sdist["url"], sdist["digests"]["sha256"])
+          PY
+          )
+          EOF
+          sed -i -E "s#^  url \".*\"#  url \"${url}\"#" "Formula/$FORMULA.rb"
+          sed -i -E "s#^  sha256 \".*\"#  sha256 \"${sha256}\"#" "Formula/$FORMULA.rb"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # --ignore-main-package-cooldown lets this run the same day as a release:
+      # PyPI's fresh-upload guard would otherwise hide the just-published
+      # version. Dependencies are long-published, so they still respect it.
+      - name: Regenerate resources
+        run: brew update-python-resources --ignore-main-package-cooldown "denrou/tap/$FORMULA"
+
+      - run: brew style "denrou/tap/$FORMULA"
+
+      - name: Commit and push if changed
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: scripts/commit-formula "$FORMULA" "$VERSION"

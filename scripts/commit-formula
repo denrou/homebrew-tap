@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Commits Formula/<name>.rb when the update changed it, then pushes to main.
+# Run by the Update Formula workflow, which provides GITHUB_TOKEN and
+# GITHUB_REPOSITORY.
+#
+#   scripts/commit-formula ggit 0.6.1
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+name="$1"
+version="$2"
+if git diff --quiet -- "Formula/$name.rb"; then
+  echo "Formula/$name.rb already described $version."
+  exit 0
+fi
+git config user.name "github-actions[bot]"
+git config user.email "github-actions[bot]@users.noreply.github.com"
+git commit -m "Update $name to $version" -- "Formula/$name.rb"
+# Explicit token and refspec: once the checkout is a tap, a plain push has no
+# credentials and no upstream branch.
+git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+# Another formula's update may have landed since the checkout.
+git pull --rebase origin main
+git push origin HEAD:main

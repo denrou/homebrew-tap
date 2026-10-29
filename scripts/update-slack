@@ -2,10 +2,10 @@
 # Rewrites Formula/slack.rb for one release of denrou/slack, from the
 # checksums.txt its Release workflow publishes next to the archives.
 #
-#   ./update          the latest release
-#   ./update 0.8.0    that release
+#   scripts/update-slack          the latest release
+#   scripts/update-slack 0.8.0    that release
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 repo="denrou/slack"
 version="${1:-}"
