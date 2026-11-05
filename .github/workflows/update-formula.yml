@@ -53,6 +53,8 @@ jobs:
           taps="$(brew --repository)/Library/Taps/denrou"
           mkdir -p "$taps"
           ln -s "$GITHUB_WORKSPACE" "$taps/homebrew-tap"
+          # Homebrew 7 refuses to load a formula from an untrusted third-party tap.
+          brew trust denrou/tap
 
       - run: brew audit --strict denrou/tap/slack
 
@@ -89,6 +91,8 @@ jobs:
           taps="$(brew --repository)/Library/Taps/denrou"
           mkdir -p "$taps"
           ln -s "$GITHUB_WORKSPACE" "$taps/homebrew-tap"
+          # Homebrew 7 refuses to load a formula from an untrusted third-party tap.
+          brew trust denrou/tap
 
       # Point the formula's own url/sha256 at the latest PyPI sdist. The
       # version is carried in the url, so there is no separate version line
