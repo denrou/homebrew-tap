@@ -17,7 +17,7 @@ on:
           - gh-prs
           - ggit
       version:
-        description: "slack only: the release, without the v (default: the latest)"
+        description: "slack and gh-prs only: the release, without the v (default: the latest)"
         required: false
         default: ""
 
@@ -31,19 +31,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # slack ships prebuilt binaries, described from the release's checksums.
-  slack:
-    if: inputs.formula == 'slack'
+  # slack and gh-prs ship prebuilt binaries, described from the release's
+  # checksums.
+  binary:
+    if: inputs.formula == 'slack' || inputs.formula == 'gh-prs'
     # macOS rather than Linux: the macOS binary is the one in use, so it is
     # the one to install and test here.
     runs-on: macos-latest
+    env:
+      FORMULA: ${{ inputs.formula }}
 
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - run: scripts/update-slack "$VERSION"
+      - run: scripts/update-binary "$FORMULA" "$VERSION"
         env:
           VERSION: ${{ inputs.version }}
 
@@ -56,22 +59,22 @@ jobs:
           # Homebrew 7 refuses to load a formula from an untrusted third-party tap.
           brew trust denrou/tap
 
-      - run: brew audit --strict denrou/tap/slack
+      - run: brew audit --strict "denrou/tap/$FORMULA"
 
-      - run: brew install --verbose denrou/tap/slack
+      - run: brew install --verbose "denrou/tap/$FORMULA"
 
-      - run: brew test --verbose denrou/tap/slack
+      - run: brew test --verbose "denrou/tap/$FORMULA"
 
       - name: Commit and push if changed
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          version="$(sed -n 's|.*/releases/download/v\([^/]*\)/.*|\1|p' Formula/slack.rb | head -n 1)"
-          scripts/commit-formula slack "$version"
+          version="$(sed -n 's|.*/releases/download/v\([^/]*\)/.*|\1|p' "Formula/$FORMULA.rb" | head -n 1)"
+          scripts/commit-formula "$FORMULA" "$version"
 
-  # gh-prs and ggit are Python packages, built from their PyPI sdist.
+  # ggit is a Python package, built from its PyPI sdist.
   pypi:
-    if: inputs.formula != 'slack'
+    if: inputs.formula == 'ggit'
     runs-on: ubuntu-latest
     env:
       FORMULA: ${{ inputs.formula }}
