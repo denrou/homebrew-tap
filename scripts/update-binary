@@ -13,10 +13,13 @@ case "$name" in
   slack)
     class="Slack"
     desc="Unread Slack messages in the terminal, with a screen to read and reply"
+    binaries=(slack)
     ;;
   gh-prs)
     class="GhPrs"
-    desc="CLI for listing GitHub pull requests that need your attention"
+    desc="List the GitHub pull requests and issues that need your attention"
+    # One release of the denrou/gh-prs workspace ships both tools.
+    binaries=(gh-prs gh-issues)
     ;;
   *)
     echo "$name does not ship release binaries" >&2
@@ -45,6 +48,11 @@ sha() {
 mac_sha="$(sha aarch64-apple-darwin)"
 linux_sha="$(sha x86_64-unknown-linux-gnu)"
 
+# "a", "b" for bin.install, and one version check per binary.
+installed="$(printf '"%s", ' "${binaries[@]}")"
+installed="${installed%, }"
+checks="$(printf '    assert_match version.to_s, shell_output("#{bin}/%s --version")\n' "${binaries[@]}")"
+
 cat >"Formula/$name.rb" <<RUBY
 class $class < Formula
   desc "$desc"
@@ -66,11 +74,11 @@ class $class < Formula
   end
 
   def install
-    bin.install "$name"
+    bin.install $installed
   end
 
   test do
-    assert_match version.to_s, shell_output("#{bin}/$name --version")
+$checks
   end
 end
 RUBY
