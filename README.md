@@ -34,5 +34,5 @@ The [Update Formula](.github/workflows/update-formula.yml) workflow moves one fo
 gh workflow run update-formula.yml --repo denrou/homebrew-tap -f formula=ggit
 ```
 
-- **slack** and **gh-prs**: `scripts/update-binary` rewrites the formula from the `checksums.txt` published with the release (`-f version=0.8.0` for a given one), and the run installs and tests it on macOS. The gh-prs formula installs two binaries, `gh-prs` and `gh-issues`, which one release of its workspace ships together.
+- **slack** and **gh-prs**: `scripts/update-binary` rewrites the formula from the `checksums.txt` published with the release (`-f version=0.8.0` for a given one), and the run installs and tests it on macOS. The gh-prs formula installs two binaries, `gh-prs` and `gh-issues`, which one release of its workspace ships together. The slack formula also installs the Claude Code skill its archive holds (`skills/slack`), and says at the end of the install how to link it.
 - **ggit**: the formula points at the PyPI sdist, and `brew update-python-resources` regenerates its dependencies. gh-prs did the same up to 0.18.1, its last Python release.
