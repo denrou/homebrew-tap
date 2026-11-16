@@ -70,7 +70,7 @@ if [ -n "$skill" ]; then
       The skill that teaches Claude Code to use $name is installed with it.
       To enable it, link it once (it then follows brew upgrade):
         mkdir -p ~/.claude/skills
-        ln -s #{opt_pkgshare}/skills/$skill ~/.claude/skills/$skill
+        ln -sfn #{opt_pkgshare}/skills/$skill ~/.claude/skills/$skill
     EOS
   end
 "
