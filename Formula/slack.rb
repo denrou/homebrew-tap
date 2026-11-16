@@ -5,15 +5,15 @@ class Slack < Formula
 
   on_macos do
     on_arm do
-      url "https://github.com/denrou/slack/releases/download/v0.22.0/slack-v0.22.0-aarch64-apple-darwin.tar.gz"
-      sha256 "771b77723ab765b0c9ee6079f7afc9b01b20dba93568e55f3755af03a75defd9"
+      url "https://github.com/denrou/slack/releases/download/v0.23.0/slack-v0.23.0-aarch64-apple-darwin.tar.gz"
+      sha256 "03b88dee64f5622bc459f875f400a601f7ddce10dca94ee974d8ae6eca4b57c4"
     end
   end
 
   on_linux do
     on_intel do
-      url "https://github.com/denrou/slack/releases/download/v0.22.0/slack-v0.22.0-x86_64-unknown-linux-gnu.tar.gz"
-      sha256 "783c02a59c8d97a90ae376a94bcd0a2811ae4bf19ea35e5d65e8b64ff1d2062a"
+      url "https://github.com/denrou/slack/releases/download/v0.23.0/slack-v0.23.0-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "fdcf484aa6b22e4b53dcf201b176a5cb3ace249806c468ce79ae0cbf2a08490c"
     end
   end
 
