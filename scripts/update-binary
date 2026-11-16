@@ -9,11 +9,15 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 name="${1:?usage: scripts/update-binary <formula> [version]}"
+skill=""
 case "$name" in
   slack)
     class="Slack"
-    desc="Unread Slack messages in the terminal, with a screen to read and reply"
+    desc="Read and answer Slack from the terminal"
     binaries=(slack)
+    # The archive holds skills/slack, the manual an agent reads, from the
+    # release after 0.21.0: an older one has none and fails at brew install.
+    skill="slack"
     ;;
   gh-prs)
     class="GhPrs"
@@ -53,6 +57,25 @@ installed="$(printf '"%s", ' "${binaries[@]}")"
 installed="${installed%, }"
 checks="$(printf '    assert_match version.to_s, shell_output("#{bin}/%s --version")\n' "${binaries[@]}")"
 
+# A tool that ships a Claude Code skill: installed under share, so the link
+# the caveats give (through opt, which follows the version) survives upgrades.
+skill_install=""
+caveats=""
+if [ -n "$skill" ]; then
+  skill_install=$'\n    pkgshare.install "skills"'
+  checks+=$'\n'"    assert_path_exists pkgshare/\"skills/$skill/SKILL.md\""
+  caveats="
+  def caveats
+    <<~EOS
+      The skill that teaches Claude Code to use $name is installed with it.
+      To enable it, link it once (it then follows brew upgrade):
+        mkdir -p ~/.claude/skills
+        ln -sfn #{opt_pkgshare}/skills/$skill ~/.claude/skills/$skill
+    EOS
+  end
+"
+fi
+
 cat >"Formula/$name.rb" <<RUBY
 class $class < Formula
   desc "$desc"
@@ -74,9 +97,9 @@ class $class < Formula
   end
 
   def install
-    bin.install $installed
+    bin.install $installed$skill_install
   end
-
+$caveats
   test do
 $checks
   end
